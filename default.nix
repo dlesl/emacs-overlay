@@ -77,8 +77,37 @@ let
     ];
   });
 
+  emacsMacportUnstable = let
+    repoMeta = super.lib.importJSON ./repos/emacs/emacs-macport-unstable.json;
+  in self.emacsMacport.overrideAttrs(old: {
+    name = repoMeta.version;
+    inherit (repoMeta) version;
+    src = super.fetchgit {
+      url = "https://bitbucket.org/mituharu/emacs-mac.git";
+      inherit (repoMeta) sha256 rev;
+    };
+    buildInputs = old.buildInputs ++ [ super.jansson ];
+    patches = [
+      ./patches/clean-env.patch
+    ];
+    postUnpack = ''
+      # extract retina image resources
+      tar xzfv $hiresSrc --strip 1 -C $sourceRoot
+    '';
+    postPatch = ''
+      substituteInPlace lisp/international/mule-cmds.el \
+        --replace /usr/share/locale ${super.gettext}/share/locale
+      # use newer emacs icon
+      cp nextstep/Cocoa/Emacs.base/Contents/Resources/Emacs.icns mac/Emacs.app/Contents/Resources/Emacs.icns
+      # Fix sandbox impurities.
+      substituteInPlace Makefile.in --replace '/bin/pwd' 'pwd'
+      substituteInPlace lib-src/Makefile.in --replace '/bin/pwd' 'pwd'
+    '';
+    preConfigure = "./autogen.sh";
+  });
+
 in {
-  inherit emacsGit emacsUnstable;
+  inherit emacsGit emacsUnstable emacsMacportUnstable;
 
   inherit emacsGcc;
 
